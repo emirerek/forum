@@ -1,0 +1,74 @@
+:root {
+    --app-width: 960px;
+
+    --gray-1: #111111;
+    --gray-2: #191919;
+    --gray-3: #222222;
+    --gray-4: #2a2a2a;
+    --gray-5: #313131;
+    --gray-6: #3a3a3a;
+    --gray-7: #484848;
+    --gray-8: #606060;
+    --gray-9: #6e6e6e;
+    --gray-10: #7b7b7b;
+    --gray-11: #b4b4b4;
+    --gray-12: #eeeeee;
+
+    --blue-10: #3b9eff;
+    --blue-11: #70b8ff;
+
+    --bg-primary: var(--gray-1);
+    --bg-secondary: var(--gray-2);
+
+    --component: var(--gray-3);
+    --component-hover: var(--gray-4);
+    --component-focus: var(--gray-5);
+
+    --border-bg: var(--gray-6);
+    --border: var(--gray-7);
+    --border-focus: var(--gray-8);
+
+    --solid: var(--gray-9);
+    --solid-hover: var(--gray-10);
+
+    --text-primary: var(--gray-12);
+    --text-secondary: var(--gray-11);
+
+    --link: var(--blue-10);
+    --link-hover: var(--blue-11);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    height: 100vh;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-primary);
+}
+
+p, h1, h2, h3 {
+    color: var(--text-primary);
+}
+
+span {
+    color: var(--text-secondary);
+}
+
+a {
+    color: var(--link);
+    font-weight: bold;
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--link-hover);
+}
