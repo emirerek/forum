@@ -15,11 +15,15 @@ func NewAccountStore(db *gorm.DB) *AccountStore {
 	return &AccountStore{db}
 }
 
-func (store *AccountStore) SelectAccount(ctx context.Context, accountID int) (model.Account, error) {
+func (store *AccountStore) SelectAccount(ctx context.Context, accountId int) (model.Account, error) {
 	var account model.Account
 	err := store.db.
 		WithContext(ctx).
-		First(&account, accountID).Error
+		Preload("Threads.Account").
+		Preload("Replies.Account").
+		Preload("Threads").
+		Preload("Replies").
+		First(&account, accountId).Error
 	if err != nil {
 		return account, err
 	}
@@ -28,9 +32,10 @@ func (store *AccountStore) SelectAccount(ctx context.Context, accountID int) (mo
 
 func (store *AccountStore) SelectAccountCredentials(ctx context.Context, username, email string) (model.AccountCredentials, error) {
 	var accountCredentials model.AccountCredentials
-	err := store.db.WithContext(ctx).
+	err := store.db.
+		WithContext(ctx).
 		Where("username = ? OR email = ?", username, email).
-		Select("id, username, email, password_hash").
+		Select("id, username, email, password_hash, is_admin").
 		First(&accountCredentials).Error
 	if err != nil {
 		return accountCredentials, err
@@ -54,6 +59,7 @@ func (store *AccountStore) InsertAccount(ctx context.Context, accountInsert *mod
 		Username:     accountInsert.Username,
 		Email:        accountInsert.Email,
 		PasswordHash: accountInsert.PasswordHash,
+		ProfilePath:  accountInsert.ProfilePath,
 	}
 	err := store.db.
 		WithContext(ctx).
@@ -71,7 +77,7 @@ func (store *AccountStore) UpdateAccountCredentials(ctx context.Context, account
 	}
 	result := store.db.WithContext(ctx).
 		Model(&model.Account{}).
-		Where("id = ?", accountCreds.ID).
+		Where("id = ?", accountCreds.Id).
 		Updates(&account)
 	if result.Error != nil {
 		return result.Error
@@ -82,10 +88,10 @@ func (store *AccountStore) UpdateAccountCredentials(ctx context.Context, account
 	return nil
 }
 
-func (store *AccountStore) DeleteAccount(ctx context.Context, accountID int) error {
+func (store *AccountStore) DeleteAccount(ctx context.Context, accountId int) error {
 	result := store.db.
 		WithContext(ctx).
-		Delete(&model.Account{}, accountID)
+		Delete(&model.Account{}, accountId)
 	if result.Error != nil {
 		return result.Error
 	}

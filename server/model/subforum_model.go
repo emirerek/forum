@@ -4,7 +4,8 @@ type Subforum struct {
 	Base
 	Title       string    `gorm:"unique;not null" json:"title"`
 	Description string    `gorm:"not null" json:"description"`
-	Threads     []*Thread `gorm:"foreignKey:SubforumID" json:"threads"`
+	Threads     []*Thread `gorm:"foreignKey:SubforumId" json:"threads"`
+	ThreadCount int       `gorm:"default:0" json:"threadCount"`
 }
 
 func (Subforum) TableName() string {
@@ -12,8 +13,8 @@ func (Subforum) TableName() string {
 }
 
 type SubforumPost struct {
-	Title       string `json:"title" binding:"required"`
-	Description string `json:"description" binding:"required"`
+	Title       string `json:"title" validate:"required"`
+	Description string `json:"description" validate:"required"`
 }
 
 type SubforumPatch struct {
@@ -27,7 +28,7 @@ type SubforumInsert struct {
 }
 
 type SubforumUpdate struct {
-	ID          int
+	Id          int
 	Title       string
 	Description string
 }

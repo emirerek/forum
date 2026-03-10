@@ -56,14 +56,7 @@ func HashPassword(password string) (string, error) {
 		threads: 1,
 		keylen:  32,
 	}
-	hash := argon2.IDKey(
-		passwordBytes,
-		salt,
-		p.time,
-		p.memory,
-		p.threads,
-		p.keylen,
-	)
+	hash := argon2.IDKey(passwordBytes, salt, p.time, p.memory, p.threads, p.keylen)
 	encodedSalt := base64.RawStdEncoding.EncodeToString(salt)
 	encodedHash := base64.RawStdEncoding.EncodeToString(hash)
 	passwordHash = fmt.Sprintf(

@@ -15,11 +15,11 @@ func NewSubforumStore(db *gorm.DB) *SubforumStore {
 	return &SubforumStore{db}
 }
 
-func (store *SubforumStore) SelectSubforum(ctx context.Context, subforumID int) (model.Subforum, error) {
+func (store *SubforumStore) SelectSubforum(ctx context.Context, subforumId int) (model.Subforum, error) {
 	var subforum model.Subforum
 	err := store.db.
 		WithContext(ctx).
-		Where("id = ?", subforumID).
+		Where("id = ?", subforumId).
 		First(&subforum).Error
 	if err != nil {
 		return subforum, err
@@ -67,7 +67,7 @@ func (store *SubforumStore) UpdateSubforum(ctx context.Context, subforumUpdate *
 	result := store.db.
 		WithContext(ctx).
 		Model(&subforum).
-		Where("id = ?", subforumUpdate.ID).
+		Where("id = ?", subforumUpdate.Id).
 		Updates(&subforum)
 	if err := result.Error; err != nil {
 		return err
@@ -78,10 +78,10 @@ func (store *SubforumStore) UpdateSubforum(ctx context.Context, subforumUpdate *
 	return nil
 }
 
-func (store *SubforumStore) DeleteSubforum(ctx context.Context, subforumID int) error {
+func (store *SubforumStore) DeleteSubforum(ctx context.Context, subforumId int) error {
 	result := store.db.
 		WithContext(ctx).
-		Where("id = ?", subforumID).
+		Where("id = ?", subforumId).
 		Delete(&model.Subforum{})
 	if err := result.Error; err != nil {
 		return err

@@ -6,23 +6,25 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gorilla/sessions"
 	"github.com/labstack/echo/v4"
 )
 
 type ReplyHandler struct {
-	store *store.ReplyStore
+	store   *store.ReplyStore
+	session *sessions.CookieStore
 }
 
-func NewReplyHandler(store *store.ReplyStore) *ReplyHandler {
-	return &ReplyHandler{store}
+func NewReplyHandler(store *store.ReplyStore, session *sessions.CookieStore) *ReplyHandler {
+	return &ReplyHandler{store, session}
 }
 
 func (handler *ReplyHandler) GetReply(c echo.Context) error {
-	replyID, err := strconv.Atoi(c.Param("replyId"))
+	replyId, err := strconv.Atoi(c.Param("replyId"))
 	if err != nil {
 		return ErrPathParam
 	}
-	reply, err := handler.store.SelectReply(c.Request().Context(), replyID)
+	reply, err := handler.store.SelectReply(c.Request().Context(), replyId)
 	if err != nil {
 		return handleDatabaseError(err)
 	}
@@ -38,27 +40,44 @@ func (handler *ReplyHandler) GetReplies(c echo.Context) error {
 }
 
 func (handler *ReplyHandler) PostReply(c echo.Context) error {
+	session, err := handler.session.Get(c.Request(), "account")
+	if err != nil || session.Values["authenticated"] != true {
+		return c.JSON(http.StatusUnauthorized, "authentication required")
+	}
+	userId, _ := session.Values["accountId"].(int)
 	var replyPost model.ReplyPost
 	if err := c.Bind(&replyPost); err != nil {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 	replyInsert := &model.ReplyInsert{
-		AccountID: replyPost.AccountID,
-		ThreadID:  replyPost.ThreadID,
+		ThreadId:  replyPost.ThreadId,
 		Content:   replyPost.Content,
+		AccountId: userId,
 	}
-	err := handler.store.InsertReply(c.Request().Context(), replyInsert)
-	if err != nil {
-		return handleDatabaseError(err)
+	if handler.store.InsertReply(c.Request().Context(), replyInsert) != nil {
+		return handleDatabaseError(nil)
 	}
 	return c.JSON(http.StatusOK, "reply created successfully")
 }
 
 func (handler *ReplyHandler) PatchReply(c echo.Context) error {
+	session, err := handler.session.Get(c.Request(), "account")
+	if err != nil || session.Values["authenticated"] != true {
+		return c.JSON(http.StatusUnauthorized, "authentication required")
+	}
+	userId, _ := session.Values["accountId"].(int)
+	isAdmin := session.Values["isAdmin"] == true
 	var replyPatch model.ReplyPatch
-	replyID, err := strconv.Atoi(c.Param("replyId"))
+	replyId, err := strconv.Atoi(c.Param("replyId"))
 	if err != nil {
 		return ErrPathParam
+	}
+	reply, err := handler.store.SelectReply(c.Request().Context(), replyId)
+	if err != nil {
+		return handleDatabaseError(err)
+	}
+	if !isAdmin && int(reply.AccountId) != userId {
+		return c.JSON(http.StatusForbidden, "not allowed to edit this reply")
 	}
 	if err := c.Bind(&replyPatch); err != nil {
 		return c.JSON(http.StatusBadRequest, err.Error())
@@ -67,7 +86,7 @@ func (handler *ReplyHandler) PatchReply(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 	replyUpdate := &model.ReplyUpdate{
-		ID:      replyID,
+		Id:      replyId,
 		Content: replyPatch.Content,
 	}
 	err = handler.store.UpdateReply(c.Request().Context(), replyUpdate)
@@ -78,11 +97,24 @@ func (handler *ReplyHandler) PatchReply(c echo.Context) error {
 }
 
 func (handler *ReplyHandler) DeleteReply(c echo.Context) error {
-	replyID, err := strconv.Atoi(c.Param("replyId"))
+	session, err := handler.session.Get(c.Request(), "account")
+	if err != nil || session.Values["authenticated"] != true {
+		return c.JSON(http.StatusUnauthorized, "authentication required")
+	}
+	userId, _ := session.Values["accountId"].(int)
+	isAdmin := session.Values["isAdmin"] == true
+	replyId, err := strconv.Atoi(c.Param("replyId"))
 	if err != nil {
 		return ErrPathParam
 	}
-	err = handler.store.DeleteReply(c.Request().Context(), replyID)
+	reply, err := handler.store.SelectReply(c.Request().Context(), replyId)
+	if err != nil {
+		return handleDatabaseError(err)
+	}
+	if !isAdmin && int(reply.AccountId) != userId {
+		return c.JSON(http.StatusForbidden, "not allowed to delete this reply")
+	}
+	err = handler.store.DeleteReply(c.Request().Context(), replyId)
 	if err != nil {
 		return handleDatabaseError(err)
 	}

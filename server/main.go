@@ -35,18 +35,45 @@ func main() {
 		log.Fatal("failed to initialize database: ", err)
 	}
 
+	// Create admin user if not exists
+	adminUsername := config.Admin.Username
+	adminEmail := config.Admin.Email
+	adminPassword := config.Admin.Password
+	if adminUsername != "" && adminEmail != "" && adminPassword != "" {
+		var count int64
+		db.Model(&model.Account{}).Where("username = ? OR email = ?", adminUsername, adminEmail).Count(&count)
+		if count == 0 {
+			passwordHash, err := utility.HashPassword(adminPassword)
+			if err != nil {
+				log.Fatalf("failed to hash admin password: %v", err)
+			}
+			admin := &model.Account{
+				Username:     adminUsername,
+				Email:        adminEmail,
+				PasswordHash: passwordHash,
+				IsAdmin:      true,
+			}
+			if err := db.Create(admin).Error; err != nil {
+				log.Fatalf("failed to create admin user: %v", err)
+			}
+			log.Printf("Admin user '%s' created.", adminUsername)
+		} else {
+			log.Printf("Admin user '%s' already exists.", adminUsername)
+		}
+	}
+
 	server := echo.New()
 	server.Validator = &utility.Validator{Validator: validator.New()}
 	server.Use(middleware.Logger())
 	server.Use(middleware.Recover())
 	server.Use(middleware.CORS())
 
-	cookieStore := sessions.NewCookieStore()
+	cookieStore := sessions.NewCookieStore([]byte(config.Secret))
 	cookieStore.Options = &sessions.Options{
 		MaxAge:   24 * 60 * 60 * 1000,
 		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
 	}
 
 	apiRouter := server.Group("/api")
@@ -56,15 +83,15 @@ func main() {
 	AddAccountRoutes(apiRouter, accountHandler)
 
 	subforumStore := store.NewSubforumStore(db)
-	subforumHandler := handler.NewSubforumHandler(subforumStore)
+	subforumHandler := handler.NewSubforumHandler(subforumStore, cookieStore)
 	AddSubforumRoutes(apiRouter, subforumHandler)
 
 	threadStore := store.NewThreadStore(db)
-	threadHandler := handler.NewThreadHandler(threadStore)
+	threadHandler := handler.NewThreadHandler(threadStore, cookieStore)
 	AddThreadRoutes(apiRouter, threadHandler)
 
 	replyStore := store.NewReplyStore(db)
-	replyHandler := handler.NewReplyHandler(replyStore)
+	replyHandler := handler.NewReplyHandler(replyStore, cookieStore)
 	AddReplyRoutes(apiRouter, replyHandler)
 
 	authHandler := handler.NewAuthHandler(accountStore, cookieStore)
@@ -93,7 +120,7 @@ func AddSubforumRoutes(
 ) {
 	subforumRouter := router.Group("/subforum")
 	subforumRouter.GET("/", subforumHandler.GetSubforums)
-	subforumRouter.GET("/:subforumId", subforumHandler.GetSubforums)
+	subforumRouter.GET("/:subforumId", subforumHandler.GetSubforum)
 	subforumRouter.POST("/", subforumHandler.PostSubforum)
 	subforumRouter.PATCH("/:subforumId", subforumHandler.PatchSubforum)
 	subforumRouter.DELETE("/:subforumId", subforumHandler.DeleteSubforum)
@@ -130,4 +157,6 @@ func AddAuthRoutes(
 	authRouter := router.Group("/auth")
 	authRouter.POST("/login", authHandler.Login)
 	authRouter.POST("/logout", authHandler.Logout)
+	authRouter.POST("/register", authHandler.Register)
+	authRouter.GET("/me", authHandler.Me)
 }

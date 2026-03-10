@@ -45,8 +45,8 @@ func (store *ReplyStore) SelectReplies(ctx context.Context) ([]model.Reply, erro
 
 func (store *ReplyStore) InsertReply(ctx context.Context, replyInsert *model.ReplyInsert) error {
 	reply := &model.Reply{
-		AccountID: replyInsert.AccountID,
-		ThreadID:  replyInsert.ThreadID,
+		AccountId: replyInsert.AccountId,
+		ThreadId:  replyInsert.ThreadId,
 		Content:   replyInsert.Content,
 	}
 	err := store.db.
@@ -65,7 +65,7 @@ func (store *ReplyStore) UpdateReply(ctx context.Context, replyUpdate *model.Rep
 	result := store.db.
 		WithContext(ctx).
 		Model(&reply).
-		Where("id = ?", replyUpdate.ID).
+		Where("id = ?", replyUpdate.Id).
 		Updates(reply)
 	if err := result.Error; err != nil {
 		return err

@@ -5,10 +5,18 @@ import (
 	"os"
 )
 
+type AdminConfig struct {
+	Username string `json:"adminUsername"`
+	Email    string `json:"adminEmail"`
+	Password string `json:"adminPassword"`
+}
+
 type Config struct {
-	Host string `json:"host"`
-	Port string `json:"port"`
-	DSN  string `json:"dsn"`
+	Host   string      `json:"host"`
+	Port   string      `json:"port"`
+	DSN    string      `json:"dsn"`
+	Secret string      `json:"secret"`
+	Admin  AdminConfig `json:"admin"`
 }
 
 func Load(path string) (*Config, error) {

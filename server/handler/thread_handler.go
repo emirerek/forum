@@ -6,23 +6,25 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gorilla/sessions"
 	"github.com/labstack/echo/v4"
 )
 
 type ThreadHandler struct {
-	store *store.ThreadStore
+	store   *store.ThreadStore
+	session *sessions.CookieStore
 }
 
-func NewThreadHandler(store *store.ThreadStore) *ThreadHandler {
-	return &ThreadHandler{store}
+func NewThreadHandler(store *store.ThreadStore, session *sessions.CookieStore) *ThreadHandler {
+	return &ThreadHandler{store, session}
 }
 
 func (handler *ThreadHandler) GetThread(c echo.Context) error {
-	threadID, err := strconv.Atoi(c.Param("threadId"))
+	threadId, err := strconv.Atoi(c.Param("threadId"))
 	if err != nil {
 		return ErrPathParam
 	}
-	thread, err := handler.store.SelectThread(c.Request().Context(), threadID)
+	thread, err := handler.store.SelectThread(c.Request().Context(), threadId)
 	if err != nil {
 		return handleDatabaseError(err)
 	}
@@ -31,14 +33,14 @@ func (handler *ThreadHandler) GetThread(c echo.Context) error {
 
 func (handler *ThreadHandler) GetThreads(c echo.Context) error {
 	var threads []model.Thread
-	var subforumID int
+	var subforumId int
 	var err error
-	if c.QueryParams().Has("subforumID") {
-		subforumID, err = strconv.Atoi(c.QueryParam("subforumID"))
+	if c.QueryParams().Has("subforumId") {
+		subforumId, err = strconv.Atoi(c.QueryParam("subforumId"))
 		if err != nil {
 			return ErrQueryParam
 		}
-		threads, err = handler.store.SelectThreadsBySubforum(c.Request().Context(), subforumID)
+		threads, err = handler.store.SelectThreadsBySubforum(c.Request().Context(), subforumId)
 	} else {
 		threads, err = handler.store.SelectThreads(c.Request().Context())
 	}
@@ -57,8 +59,8 @@ func (handler *ThreadHandler) PostThread(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 	threadInsert := &model.ThreadInsert{
-		AccountID:  threadPost.AccountID,
-		SubforumID: threadPost.SubforumID,
+		AccountId:  threadPost.AccountId,
+		SubforumId: threadPost.SubforumId,
 		Title:      threadPost.Title,
 		Content:    threadPost.Content,
 	}
@@ -70,11 +72,24 @@ func (handler *ThreadHandler) PostThread(c echo.Context) error {
 }
 
 func (handler *ThreadHandler) PatchThread(c echo.Context) error {
-	var threadPatch model.ThreadPatch
-	threadID, err := strconv.Atoi(c.Param("threadId"))
+	session, err := handler.session.Get(c.Request(), "account")
+	if err != nil || session.Values["authenticated"] != true {
+		return c.JSON(http.StatusUnauthorized, "authentication required")
+	}
+	userId, _ := session.Values["accountId"].(int)
+	isAdmin := session.Values["isAdmin"] == true
+	threadId, err := strconv.Atoi(c.Param("threadId"))
 	if err != nil {
 		return ErrPathParam
 	}
+	thread, err := handler.store.SelectThread(c.Request().Context(), threadId)
+	if err != nil {
+		return handleDatabaseError(err)
+	}
+	if !isAdmin && int(thread.AccountId) != userId {
+		return c.JSON(http.StatusForbidden, "not allowed to edit this thread")
+	}
+	var threadPatch model.ThreadPatch
 	if err := c.Bind(&threadPatch); err != nil {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
@@ -82,7 +97,7 @@ func (handler *ThreadHandler) PatchThread(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 	threadUpdate := &model.ThreadUpdate{
-		ID:      threadID,
+		Id:      threadId,
 		Title:   threadPatch.Title,
 		Content: threadPatch.Content,
 	}
@@ -94,11 +109,24 @@ func (handler *ThreadHandler) PatchThread(c echo.Context) error {
 }
 
 func (handler *ThreadHandler) DeleteThread(c echo.Context) error {
-	threadID, err := strconv.Atoi(c.Param("threadId"))
+	session, err := handler.session.Get(c.Request(), "account")
+	if err != nil || session.Values["authenticated"] != true {
+		return c.JSON(http.StatusUnauthorized, "authentication required")
+	}
+	userId, _ := session.Values["accountId"].(int)
+	isAdmin := session.Values["isAdmin"] == true
+	threadId, err := strconv.Atoi(c.Param("threadId"))
 	if err != nil {
 		return ErrPathParam
 	}
-	err = handler.store.DeleteThread(c.Request().Context(), threadID)
+	thread, err := handler.store.SelectThread(c.Request().Context(), threadId)
+	if err != nil {
+		return handleDatabaseError(err)
+	}
+	if !isAdmin && int(thread.AccountId) != userId {
+		return c.JSON(http.StatusForbidden, "not allowed to delete this thread")
+	}
+	err = handler.store.DeleteThread(c.Request().Context(), threadId)
 	if err != nil {
 		return handleDatabaseError(err)
 	}
